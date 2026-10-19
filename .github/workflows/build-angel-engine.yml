@@ -1,0 +1,48 @@
+name: Angel Engine — Cloud Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Baixar nosso código
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restaurar dependências
+        shell: pwsh
+        run: dotnet restore AngelEngine.slnx
+
+      - name: Compilar camada própria e demonstração
+        shell: pwsh
+        run: dotnet build AngelEngine.slnx -c Release --no-restore
+
+      - name: Executar verificação inicial
+        shell: pwsh
+        run: dotnet run --project samples/AngelEngine.Demo/AngelEngine.Demo.csproj -c Release --no-build
+
+      - name: Empacotar código-fonte
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Compress-Archive -Path README.md, THIRD-PARTY.md, global.json, AngelEngine.slnx, src, samples -DestinationPath dist/Angel-Engine-Source.zip -Force
+
+      - name: Publicar artefatos
+        uses: actions/upload-artifact@v4
+        with:
+          name: Angel-Engine-DevKit
+          path: dist/Angel-Engine-Source.zip
+          if-no-files-found: error
+          retention-days: 14
