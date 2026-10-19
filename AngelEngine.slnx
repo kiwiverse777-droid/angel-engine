@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/AngelEngine.Core/AngelEngine.Core.csproj" />
+  <Project Path="samples/AngelEngine.Demo/AngelEngine.Demo.csproj" />
+</Solution>
