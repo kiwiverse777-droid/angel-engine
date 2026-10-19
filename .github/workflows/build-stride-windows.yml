@@ -1,0 +1,70 @@
+
+name: Angel Engine - Build Stride Windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Git LFS
+        shell: pwsh
+        run: git lfs install
+
+      - name: Download official Stride source
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/stride3d/stride.git stride-source
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to download Stride source."
+          }
+          git -C stride-source lfs pull
+          if ($LASTEXITCODE -ne 0) {
+            throw "Git LFS download failed."
+          }
+
+      - name: Inspect source and SDK
+        shell: pwsh
+        run: |
+          dotnet --info
+          Get-ChildItem stride-source -Recurse -Include *.sln,*.slnx |
+            Select-Object -First 30 -ExpandProperty FullName
+
+      - name: Attempt build
+        shell: pwsh
+        run: |
+          $solutions = @(
+            Get-ChildItem stride-source -Recurse -Include *.sln,*.slnx -File |
+            Where-Object { $_.FullName -notmatch '\\(samples|docs|tests)\\' }
+          )
+          if ($solutions.Count -eq 0) {
+            throw "No solution file was found."
+          }
+          $solution = $solutions |
+            Where-Object { $_.Name -match 'Stride' } |
+            Select-Object -First 1
+          if ($null -eq $solution) {
+            $solution = $solutions | Select-Object -First 1
+          }
+          Write-Host "Building solution: $($solution.FullName)"
+          dotnet build $solution.FullName -c Release --verbosity minimal
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: angel-engine-build-logs
+          path: |
+            stride-source/**/*.log
+            stride-source/**/*.binlog
+          if-no-files-found: ignore
+          retention-days: 7
